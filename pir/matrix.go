@@ -3,8 +3,10 @@ package pir
 // #cgo CFLAGS: -O3 -march=native
 // #include "pir.h"
 import "C"
-import "fmt"
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+)
 
 type Matrix struct {
 	Rows uint64
@@ -36,14 +38,22 @@ func MatrixNewNoAlloc(rows uint64, cols uint64) *Matrix {
 }
 
 func MatrixRand(rows uint64, cols uint64, logmod uint64, mod uint64) *Matrix {
+	// fmt.Println("matrix.go 1  Rows:", rows)
+	// fmt.Println("matrix.go 1  Cols:", cols)
 	out := MatrixNew(rows, cols)
+	// fmt.Println("matrix.go 2")
+
 	m := big.NewInt(int64(mod))
 	if mod == 0 {
 		m = big.NewInt(1 << logmod)
 	}
 	for i := 0; i < len(out.Data); i++ {
 		out.Data[i] = C.Elem(RandInt(m).Uint64())
+		// fmt.Println("len data:", len(out.Data), "\tindex:", i, "\tElem size:", unsafe.Sizeof(out.Data[i]))
 	}
+	// fmt.Println("matrix.go 3")
+	// fmt.Println("len data:", len(out.Data))
+	// defer fmt.Println("A matrix size:", int(unsafe.Sizeof(out.Data[0]))*len(out.Data))
 	return out
 }
 
@@ -111,7 +121,7 @@ func (a *Matrix) AddAt(val, i, j uint64) {
 	if (i >= a.Rows) || (j >= a.Cols) {
 		panic("Out of bounds")
 	}
-	a.Set(a.Get(i, j) + val, i, j)
+	a.Set(a.Get(i, j)+val, i, j)
 }
 
 func (a *Matrix) MatrixSub(b *Matrix) {
@@ -154,23 +164,74 @@ func MatrixMul(a *Matrix, b *Matrix) *Matrix {
 	return out
 }
 
+func MyMatrixMul(a *Matrix, a_col_packing uint64, b *Matrix, b_row_packing uint64) *Matrix {
+	new_a := MatrixZeros(a.Rows, a.Cols*a_col_packing)
+
+	if a_col_packing > 1 { // uncompressed
+		for idx, vals := range a.Data {
+			// Pack multiple DB elems into each Z_p elem
+			col := uint64(idx) % a.Cols
+			row := uint64(idx) / a.Cols
+			for i := uint64(0); i < a_col_packing; i++ {
+				cur := uint64((vals >> i & (0b1)))
+				new_a.Set(cur, row, col*a_col_packing+i)
+				// fmt.Println("Row:", row, "\tCols:", col*a_col_packing+i, "\tData:", cur)
+			}
+
+		}
+	} else {
+		new_a = a
+	}
+
+	if b_row_packing == 2 {
+		fmt.Println("a :", a.Data)
+		fmt.Println("new_a :", new_a.Data)
+		fmt.Println("b :", b.Data)
+		// panic("b_row_packing not implemented yet!")
+	}
+
+	if b.Cols == 1 {
+		// fmt.Println("new_a :", new_a.Data)
+		// fmt.Println("b :", b.Data)
+
+		return MatrixMulVec(new_a, b)
+	}
+	// if a.Cols*a_col_packing != b.Rows*b_row_packing {
+	// 	fmt.Printf("%d-by-%d vs. %d-by-%d\n", a.Rows, a.Cols*a_col_packing, b.Rows*b_row_packing, b.Cols)
+	// 	panic("Dimension mismatch")
+	// }
+
+	out := MatrixZeros(a.Rows, b.Cols)
+
+	outPtr := (*C.Elem)(&out.Data[0])
+	aPtr := (*C.Elem)(&new_a.Data[0])
+	bPtr := (*C.Elem)(&b.Data[0])
+	aRows := C.size_t(a.Rows)
+	aCols := C.size_t(a.Cols * a_col_packing)
+	bCols := C.size_t(b.Cols)
+
+	C.matMul(outPtr, aPtr, bPtr, aRows, aCols, bCols)
+
+	return out
+}
+
 func MatrixMulTransposedPacked(a *Matrix, b *Matrix, basis, compression uint64) *Matrix {
-        fmt.Printf("%d-by-%d vs. %d-by-%d\n", a.Rows, a.Cols, b.Cols, b.Rows)
-        if compression != 3 && basis != 10 {
-                panic("Must use hard-coded values!")
-        }
+	fmt.Printf("%d-by-%d vs. %d-by-%d\n", a.Rows, a.Cols, b.Cols, b.Rows)
+	if compression != 3 && basis != 10 {
+		panic("Must use hard-coded values!")
+	}
 
-        out := MatrixZeros(a.Rows, b.Rows)
+	out := MatrixZeros(a.Rows, b.Rows)
 
-        outPtr := (*C.Elem)(&out.Data[0])
-        aPtr := (*C.Elem)(&a.Data[0])
-        bPtr := (*C.Elem)(&b.Data[0])
-        aRows := C.size_t(a.Rows)
+	outPtr := (*C.Elem)(&out.Data[0])
+	aPtr := (*C.Elem)(&a.Data[0])
+	bPtr := (*C.Elem)(&b.Data[0])
+	aRows := C.size_t(a.Rows)
 	aCols := C.size_t(a.Cols)
-        bRows := C.size_t(b.Rows)
-        bCols := C.size_t(b.Cols)
+	bRows := C.size_t(b.Rows)
+	bCols := C.size_t(b.Cols)
 
-        C.matMulTransposedPacked(outPtr, aPtr, bPtr, aRows, aCols, bRows, bCols)
+	C.matMulTransposedPacked(outPtr, aPtr, bPtr, aRows, aCols, bRows, bCols)
 
 	return out
 }
@@ -287,28 +348,28 @@ func (m *Matrix) Expand(mod uint64, delta uint64) {
 }
 
 func (m *Matrix) TransposeAndExpandAndConcatColsAndSquish(mod, delta, concat, basis, d uint64) {
-        if m.Rows % concat != 0 {
-                panic("Bad input!")
-        }
+	if m.Rows%concat != 0 {
+		panic("Bad input!")
+	}
 
-        n := MatrixZeros(m.Cols*delta*concat, (m.Rows/concat+d-1)/d)
+	n := MatrixZeros(m.Cols*delta*concat, (m.Rows/concat+d-1)/d)
 
-        for j := uint64(0); j < m.Rows; j++ {
-                for i := uint64(0); i < m.Cols; i++ {
-                        val := uint64(m.Data[i+j*m.Cols])
-                        for f := uint64(0); f < delta; f++ {
-                                new_val := val % mod
-                                r := (i*delta+f) + m.Cols*delta*(j % concat)
-                                c := j / concat
-                                n.Data[r*n.Cols+c/d] += C.Elem(new_val << (basis * (c%d)))
-                                val /= mod
-                        }
-                }
-        }
+	for j := uint64(0); j < m.Rows; j++ {
+		for i := uint64(0); i < m.Cols; i++ {
+			val := uint64(m.Data[i+j*m.Cols])
+			for f := uint64(0); f < delta; f++ {
+				new_val := val % mod
+				r := (i*delta + f) + m.Cols*delta*(j%concat)
+				c := j / concat
+				n.Data[r*n.Cols+c/d] += C.Elem(new_val << (basis * (c % d)))
+				val /= mod
+			}
+		}
+	}
 
-        m.Cols = n.Cols
-        m.Rows = n.Rows
-        m.Data = n.Data
+	m.Cols = n.Cols
+	m.Rows = n.Rows
+	m.Data = n.Data
 }
 
 // Computes the inverse operations of Expand(.)
@@ -332,8 +393,8 @@ func (m *Matrix) Contract(mod uint64, delta uint64) {
 }
 
 // Compresses the matrix to store it in 'packed' form.
-// Specifically, this method squishes the matrix by representing each 
-// group of 'delta' consecutive values as a single database element, 
+// Specifically, this method squishes the matrix by representing each
+// group of 'delta' consecutive values as a single database element,
 // where each value uses 'basis' bits.
 func (m *Matrix) Squish(basis, delta uint64) {
 	n := MatrixZeros(m.Rows, (m.Cols+delta-1)/delta)
@@ -472,11 +533,11 @@ func (m *Matrix) Print() {
 }
 
 func (m *Matrix) PrintStart() {
-        fmt.Printf("%d-by-%d matrix:\n", m.Rows, m.Cols)
-        for i := uint64(0); i < 2; i++ {
-                for j := uint64(0); j < 2; j++ {
-                        fmt.Printf("%d ", m.Data[i*m.Cols+j])
-                }
-                fmt.Printf("\n")
-        }
+	fmt.Printf("%d-by-%d matrix:\n", m.Rows, m.Cols)
+	for i := uint64(0); i < 2; i++ {
+		for j := uint64(0); j < 2; j++ {
+			fmt.Printf("%d ", m.Data[i*m.Cols+j])
+		}
+		fmt.Printf("\n")
+	}
 }

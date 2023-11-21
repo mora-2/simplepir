@@ -6,14 +6,59 @@ import (
 	"math"
 	"os"
 	"strconv"
-	"testing"
 	"strings"
+	"testing"
 )
 
-const LOGQ = uint64(32)
-const SEC_PARAM = uint64(1 << 10)
+const LOGQ = uint64(32)          // ciphertext mod
+const SEC_PARAM = uint64(1 << 2) // secret demension
+
+// Test SimplePIR correctness on my DB.
+func TestMySimplePir(t *testing.T) {
+	N := uint64(10000000)
+	d := uint64(1)
+	pir := SimplePIR{}
+
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+
+	vals := my_load_db("/home/yuance/Work/Encryption/SBT/interface/data/3/SRR21948626_L1000_1e6_out.bf.bv_bit->int32.txt")
+	DB := MakeDB(N, d, &p, vals)
+	fmt.Printf("pir.params:%+v\n", p)
+	fmt.Printf("DB info%+v:\n", DB.Info)
+	RunPIR(&pir, DB, p, []uint64{860819, 1727, 1288}) // 询问下标为860819的元素
+}
+
+func TestMySimplePirWithRemakeDB(t *testing.T) {
+	LOG_PLAINTEXT := uint64(9)
+	HashTableLen := uint64(100000000)
+	Species := uint64(3)
+	N := uint64(Species * HashTableLen)
+	d := uint64(1)
+	pir := SimplePIR{}
+	WidthCompressed := uint64(math.Ceil(float64(HashTableLen) / float64(LOG_PLAINTEXT)))
+	p := pir.PickParamsGivenDimensions(Species, WidthCompressed, SEC_PARAM, LOGQ)
+
+	// p.N = SEC_PARAM
+	// p.Sigma = 6.4
+	// p.L = Species
+	// p.M = WidthCompressed
+	// p.Logq = 32
+	// p.P = 991
+
+	vals := my_load_db("/home/yuance/Work/Encryption/SBT/interface/data/2/SRR21948626_L1000_1e8_out.bf.bv_bit->int32.txt")
+	var slice [][]uint64
+	slice = append(slice, vals)
+	slice = append(slice, vals)
+	slice = append(slice, vals)
+	DB := MakeMyDB(N, d, &p, slice)
+	fmt.Printf("pir_test.go pir.params:%+v\n", p)
+	fmt.Printf("pir_test.go DB info%+v:\n", DB.Info)
+	RunMyPIR(&pir, DB, p, []uint64{31, 412, 41, 13, 4}) // 询问
+}
 
 // Test that DB packing methods are correct, when each database entry is ~ 1 Z_p elem.
+// N：entries of DB
+// d: number of bits per DB entry, namely, row_length
 func TestDBMediumEntries(t *testing.T) {
 	N := uint64(4)
 	d := uint64(9)
@@ -22,12 +67,15 @@ func TestDBMediumEntries(t *testing.T) {
 
 	vals := []uint64{1, 2, 3, 4}
 	DB := MakeDB(N, d, &p, vals)
+	fmt.Printf("pir.params:%+v\n", p)
+	fmt.Printf("DB info%+v:\n", DB.Info)
+	// fmt.Println("DB.Info.Packing = ", DB.Info.Packing, "\tDB.Info.Ne = ", DB.Info.Ne)
 	if DB.Info.Packing != 1 || DB.Info.Ne != 1 {
 		panic("Should not happen.")
 	}
 
 	for i := uint64(0); i < N; i++ {
-		if DB.GetElem(i) != (i + 1) {
+		if DB.GetElem(i) != vals[i] {
 			panic("Failure")
 		}
 	}
@@ -62,6 +110,9 @@ func TestDBLargeEntries(t *testing.T) {
 
 	vals := []uint64{1, 2, 3, 4}
 	DB := MakeDB(N, d, &p, vals)
+	fmt.Printf("pir.params:%+v\n", p)
+	fmt.Printf("DB info%+v:\n", DB.Info)
+
 	if DB.Info.Packing != 0 || DB.Info.Ne <= 1 {
 		panic("Should not happen.")
 	}
@@ -73,37 +124,46 @@ func TestDBLargeEntries(t *testing.T) {
 	}
 }
 
+// 无限长字符串存取——子数据库剪接
 func TestDBInterleaving(t *testing.T) {
 	N := uint64(16)
 	d := uint64(8)
 	numBytes := uint64(len([]byte("string 16")))
+	// numBytes = 9
+	fmt.Println("numBytes:", numBytes)
 
 	DBs := make([]*Database, numBytes)
 	pir := SimplePIR{}
-	p := pir.PickParams(N, d, uint64(1 << 10) /* n */, uint64(32) /* log q */)
+	p := pir.PickParams(N, d, uint64(1<<10) /* n */, uint64(32) /* log q */)
 
-	for n:=uint64(0); n<numBytes; n++ {
+	for n := uint64(0); n < numBytes; n++ { // 输入到数据库中的对应的第n位字节
 		val := make([]uint64, N)
-		for i:=uint64(0); i<N; i++ {
-			arr := []byte("string "+fmt.Sprint(i))
+		str := make([]string, N)
+		for i := uint64(0); i < N; i++ {
+			// 遍历待输入的记录（字符串），将所有待输入字符串中的第n位输入到数组（数据库）中，
+			// 当输入第n个字节时，如果待输入字符串长度小于n，那么对应n位补0
+			arr := []byte("string " + fmt.Sprint(i))
 			if uint64(len(arr)) > n {
 				val[i] = uint64(arr[n])
+				str[i] = string(arr[n])
 			} else {
 				val[i] = 0
+				str[i] = "0"
 			}
 		}
-		DBs[n] = MakeDB(N, d, &p, val) 
+		fmt.Printf("n=%d, str:%+v\n", n, str)
+		DBs[n] = MakeDB(N, d, &p, val)
 	}
 
 	D := pir.ConcatDBs(DBs, &p)
 
-	for i:=uint64(0); i<N; i++ {
+	for i := uint64(0); i < N; i++ {
 		val := make([]byte, numBytes)
-		for n:=uint64(0); n<numBytes; n++ {
+		for n := uint64(0); n < numBytes; n++ {
 			val[n] = byte(D.GetElem(i + N*n))
 		}
-		fmt.Printf("Got '%s' instead of '%s'\n", string(val), "string " + fmt.Sprint(i))
-		if strings.TrimRight(string(val), "\x00") != "string " + fmt.Sprint(i) {
+		fmt.Printf("Got '%s' instead of '%s'\n", string(val), "string "+fmt.Sprint(i))
+		if strings.TrimRight(string(val), "\x00") != "string "+fmt.Sprint(i) {
 			panic("Failure")
 		}
 	}
@@ -169,13 +229,13 @@ func TestSimplePir(t *testing.T) {
 }
 
 func TestSimplePirCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(8)
-        pir := SimplePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(8)
+	pir := SimplePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{262144})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{262144})
 }
 
 // Test SimplePIR correctness on DB with long entries
@@ -190,13 +250,13 @@ func TestSimplePirLongRow(t *testing.T) {
 }
 
 func TestSimplePirLongRowCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(32)
-        pir := SimplePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(32)
+	pir := SimplePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{1})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{1})
 }
 
 // Test SimplePIR correctness on big DB
@@ -211,13 +271,13 @@ func TestSimplePirBigDB(t *testing.T) {
 }
 
 func TestSimplePirBigDBCompressed(t *testing.T) {
-        N := uint64(1 << 25)
-        d := uint64(7)
-        pir := SimplePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 25)
+	d := uint64(7)
+	pir := SimplePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0})
 }
 
 // Test SimplePIR correctness on DB with short entries, and batching.
@@ -232,13 +292,13 @@ func TestSimplePirBatch(t *testing.T) {
 }
 
 func TestSimplePirBatchCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(8)
-        pir := SimplePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(8)
+	pir := SimplePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
 }
 
 // Test SimplePIR correctness on DB with long entries, and batching.
@@ -253,13 +313,13 @@ func TestSimplePirLongRowBatch(t *testing.T) {
 }
 
 func TestSimplePirLongRowBatchCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(32)
-        pir := SimplePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(32)
+	pir := SimplePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
 }
 
 // Test DoublePIR correctness on DB with short entries.
@@ -274,13 +334,13 @@ func TestDoublePir(t *testing.T) {
 }
 
 func TestDoublePirCompressed(t *testing.T) {
-        N := uint64(1 << 22)
-        d := uint64(3)
-        pir := DoublePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 22)
+	d := uint64(3)
+	pir := DoublePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0})
 }
 
 // Test DoublePIR correctness on DB with long entries.
@@ -299,17 +359,17 @@ func TestDoublePirLongRow(t *testing.T) {
 }
 
 func TestDoublePirLongRowCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(32)
-        pir := DoublePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(32)
+	pir := DoublePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
+	DB := MakeRandomDB(N, d, &p)
 
-        fmt.Printf("Executing with entries consisting of %d (>= 1) bits; p is %d; packing factor is %d; number of DB elems per entry is %d.\n",
-                d, p.P, DB.Info.Packing, DB.Info.Ne)
+	fmt.Printf("Executing with entries consisting of %d (>= 1) bits; p is %d; packing factor is %d; number of DB elems per entry is %d.\n",
+		d, p.P, DB.Info.Packing, DB.Info.Ne)
 
-        RunPIRCompressed(&pir, DB, p, []uint64{1 << 19})
+	RunPIRCompressed(&pir, DB, p, []uint64{1 << 19})
 }
 
 // Test DoublePIR correctness on big DB
@@ -324,13 +384,13 @@ func TestDoublePirBigDB(t *testing.T) {
 }
 
 func TestDoublePirBigDBCompressed(t *testing.T) {
-        N := uint64(1 << 23)
-        d := uint64(7)
-        pir := DoublePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 23)
+	d := uint64(7)
+	pir := DoublePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0})
 }
 
 // Test DoublePIR correctness on DB with short entries, and batching.
@@ -345,13 +405,13 @@ func TestDoublePirBatch(t *testing.T) {
 }
 
 func TestDoublePirBatchCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(8)
-        pir := DoublePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(8)
+	pir := DoublePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
 }
 
 // Test DoublePIR correctness on DB with long entries, and batching.
@@ -366,13 +426,13 @@ func TestDoublePirLongRowBatch(t *testing.T) {
 }
 
 func TestDoublePirLongRowBatchCompressed(t *testing.T) {
-        N := uint64(1 << 20)
-        d := uint64(32)
-        pir := DoublePIR{}
-        p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
+	N := uint64(1 << 20)
+	d := uint64(32)
+	pir := DoublePIR{}
+	p := pir.PickParams(N, d, SEC_PARAM, LOGQ)
 
-        DB := MakeRandomDB(N, d, &p)
-        RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
+	DB := MakeRandomDB(N, d, &p)
+	RunPIRCompressed(&pir, DB, p, []uint64{0, 0, 0, 0})
 }
 
 // Benchmark SimplePIR performance.

@@ -38,14 +38,12 @@ func (p *Params) PickParams(doublepir bool, samples ...uint64) {
 	if p.N == 0 || p.Logq == 0 {
 		panic("Need to specify n and q!")
 	}
-
 	num_samples := uint64(0)
 	for _, ns := range samples {
 		if ns > num_samples {
 			num_samples = ns
 		}
 	}
-
 	lines := strings.Split(lwe_params, "\n")
 	for _, l := range lines[1:] {
 		line := strings.Split(l, ",")
