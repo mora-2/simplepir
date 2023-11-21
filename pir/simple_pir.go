@@ -54,7 +54,7 @@ func (pi *SimplePIR) PickParamsGivenDimensions(l, m, n, logq uint64) Params {
 		L:    l,
 		M:    m,
 	}
-	
+
 	p.PickParams(false, m)
 	return p
 }
@@ -115,6 +115,10 @@ func (pi *SimplePIR) MyInit(info DBinfo, p Params) State {
 
 func (pi *SimplePIR) InitCompressed(info DBinfo, p Params) (State, CompressedState) {
 	seed := RandomPRGKey()
+	return pi.InitCompressedSeeded(info, p, seed)
+}
+
+func (pi *SimplePIR) InitCompressedSeeded(info DBinfo, p Params, seed *PRGKey) (State, CompressedState) {
 	bufPrgReader = NewBufPRG(NewPRG(seed))
 	return pi.Init(info, p), MakeCompressedState(seed)
 }

@@ -88,6 +88,10 @@ func (pi *DoublePIR) MyInit(info DBinfo, p Params) State { //not implemented yet
 
 func (pi *DoublePIR) InitCompressed(info DBinfo, p Params) (State, CompressedState) {
 	seed := RandomPRGKey()
+	return pi.InitCompressedSeeded(info, p, seed)
+}
+
+func (pi *DoublePIR) InitCompressedSeeded(info DBinfo, p Params, seed *PRGKey) (State, CompressedState) {
 	bufPrgReader = NewBufPRG(NewPRG(seed))
 	return pi.Init(info, p), MakeCompressedState(seed)
 }
