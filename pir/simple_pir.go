@@ -5,6 +5,7 @@ package pir
 import "C"
 import (
 	"fmt"
+	"math"
 )
 
 type SimplePIR struct{}
@@ -332,6 +333,86 @@ func (pi *SimplePIR) Recover(i uint64, batch_index uint64, offline Msg, query Ms
 	}
 	ans.MatrixAdd(interm)
 	return ReconstructElem(vals, i, info)
+}
+
+func (pi *SimplePIR) StrRecover(i uint64, batch_index uint64, offline Msg, query Msg, answer Msg,
+	shared State, client State, p Params, info DBinfo) string {
+	// secret := client.Data[0]
+	// H := offline.Data[0]
+	// ans := answer.Data[0]
+	// ratio := p.P / 2
+	// offset := uint64(0)
+	// for j := uint64(0); j < p.M; j++ {
+	// 	offset += ratio * query.Data[0].Get(j, 0)
+	// }
+	// offset %= (1 << p.Logq)
+	// offset = (1 << p.Logq) - offset
+
+	// interm := MatrixMul(H, secret)
+	// fmt.Println("ans.Rows:", ans.Rows, "\tans.Cols:", ans.Cols)
+	// fmt.Println("interm.Rows:", interm.Rows, "\tinterm.Cols:", interm.Cols)
+	// ans.MatrixSub(interm)
+
+	// var vals []uint64
+	// // Recover each Z_p element that makes up the desired database entry
+
+	// row := uint64(0)
+	// if info.Packing > 0 {
+	// 	row = i / (p.M * info.Packing)
+	// } else {
+	// 	row = i / (p.M)
+	// }
+	// for j := row * info.Ne; j < (row+1)*info.Ne; j++ {
+	// 	noised := uint64(ans.Data[j]) + offset
+	// 	denoised := p.Round(noised)
+	// 	vals = append(vals, denoised)
+	// 	// fmt.Printf("Reconstructing row %d: %d\n", j, denoised)
+	// }
+	// ans.MatrixAdd(interm)
+
+	// return ReconstructElem(vals, i, info)
+
+	secret := client.Data[0]
+	H := offline.Data[0]
+	ratio := p.P / 2
+	offset := uint64(0)
+	for j := uint64(0); j < p.M; j++ {
+		offset += ratio * query.Data[0].Get(j, 0)
+	}
+	offset %= (1 << p.Logq)
+	offset = (1 << p.Logq) - offset
+
+	interm := MatrixMul(H, secret)
+	ans := answer.Data[batch_index]
+	ans.MatrixSub(interm)
+
+	row := uint64(0)
+	if info.Packing > 0 {
+		row = i / (p.M * info.Packing)
+	} else {
+		row = i / (p.M)
+	}
+
+	flag := uint64(0)
+	var results []uint64
+	var vals []uint64
+	// Recover each Z_p element that makes up the desired database entry
+	for j := row * info.Ne; j < (row+1)*info.Ne; j++ {
+		if flag == uint64(math.Ceil(float64(64)/math.Log2(float64(p.P)))) {
+			flag = 0
+			results = append(results, ReconstructElem(vals, i, info))
+			vals = nil
+		}
+		flag += 1
+		noised := uint64(ans.Data[j]) + offset
+		denoised := p.Round(noised)
+		vals = append(vals, denoised)
+		// fmt.Printf("Reconstructing row %d: %d\n", j, denoised)
+	}
+	results = append(results, ReconstructElem(vals, i, info))
+	ans.MatrixAdd(interm)
+
+	return intTostring(results)
 }
 
 func (pi *SimplePIR) MyRecover(i []uint64, batch_index uint64, offline Msg, query Msg, answer Msg,

@@ -111,11 +111,11 @@ func main() {
 	// fmt.Printf("answer.Data[0]: %v\n", answer.Data[0])
 
 	// 3. Resconstruction
-	var result []uint64
+	var result []string
 	for index, _ := range query_index {
 		// index_to_query := i[index] + uint64(index)*batch_sz
 		index_to_query := query_index[index]
-		val := client_pir.Recover(index_to_query, uint64(index), shared_data.Offline_download,
+		val := client_pir.StrRecover(index_to_query, uint64(index), shared_data.Offline_download,
 			query.Data[index], answer, shared_state,
 			client_state[index], shared_data.P, shared_data.Info) // 返回指定下标的元素
 		result = append(result, val)
@@ -132,12 +132,12 @@ func main() {
 	fmt.Println("--------------online pahse-------------")
 	/*--------------online pahse-------------*/
 
-	// 4. send query_index
-	encoder = json.NewEncoder(conn)
-	err = encoder.Encode(query_index)
-	if err != nil {
-		fmt.Println("Error encoding query_index:", err.Error())
-		return
-	}
-	fmt.Println("4. send query_index.")
+	// // 4. send query_index
+	// encoder = json.NewEncoder(conn)
+	// err = encoder.Encode(query_index)
+	// if err != nil {
+	// 	fmt.Println("Error encoding query_index:", err.Error())
+	// 	return
+	// }
+	// fmt.Println("4. send query_index.")
 }

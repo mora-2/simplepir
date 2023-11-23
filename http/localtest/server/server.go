@@ -77,20 +77,20 @@ func handleConnection(conn net.Conn, DB *pir.Database, pir_server *pir.SimplePIR
 	fmt.Println("--------------online pahse-------------")
 	/*--------------online pahse-------------*/
 
-	// 3. Answer check
-	query_index := []uint64{}
-	decoder = json.NewDecoder(conn)
-	err = decoder.Decode(&query_index)
-	if err != nil {
-		fmt.Println("Error decoding query_index:", err.Error())
-		return
-	}
+	// // 3. Answer check
+	// query_index := []uint64{}
+	// decoder = json.NewDecoder(conn)
+	// err = decoder.Decode(&query_index)
+	// if err != nil {
+	// 	fmt.Println("Error decoding query_index:", err.Error())
+	// 	return
+	// }
 
-	result := []uint64{}
-	for _, value := range query_index { // get elem in DB
-		result = append(result, DB.GetElem(value))
-	}
-	fmt.Printf("SimplePIR result in DB:%+v\n", result)
+	// result := []uint64{}
+	// for _, value := range query_index { // get elem in DB
+	// 	result = append(result, DB.GetElem(value))
+	// }
+	// fmt.Printf("SimplePIR result in DB:%+v\n", result)
 }
 
 func main() {
@@ -98,14 +98,15 @@ func main() {
 	const LOGQ = uint64(32)          // ciphertext mod
 	const SEC_PARAM = uint64(1 << 2) // secret demension
 
-	db_vals := []uint64{141, 13, 52, 43, 44}
+	// db_vals := []uint64{141, 13, 52, 43, 44}
+	db_vals := []string{"apple", "banana", "cat", "dog"}
 	N := uint64(len(db_vals))
-	d := uint64(8)
+	d := uint64(len(pir.FindLongestElement(db_vals)) * 8) // sizeof(byte): 8
 	pir_server := pir.SimplePIR{}
 	p := pir_server.PickParams(N, d, SEC_PARAM, LOGQ)
 
 	// DB loading
-	DB := pir.MakeDB(N, d, &p, db_vals)
+	DB := pir.MakeStrDB(N, d, &p, db_vals)
 
 	// start listening
 	listener, err := net.Listen("tcp", ":8080")

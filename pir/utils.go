@@ -1,7 +1,9 @@
 package pir
 
-import "math"
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 type State struct {
 	Data []*Matrix
@@ -110,6 +112,33 @@ func Num_DB_entries(N, row_length, p uint64) (uint64, uint64, uint64) {
 	return N * ne, ne, 0
 }
 
+func Num_StrDB_entries(N, row_length, p uint64, Item_bits uint64) (uint64, uint64, uint64) {
+	if float64(row_length) <= math.Log2(float64(p)) {
+		// pack multiple DB entries into a single Z_p elem
+		logp := uint64(math.Log2(float64(p)))
+		entries_per_elem := logp / row_length
+		db_entries := uint64(math.Ceil(float64(N) / float64(entries_per_elem)))
+		if db_entries == 0 || db_entries > N {
+			fmt.Printf("Num entries is %d; N is %d\n", db_entries, N)
+			panic("Should not happen")
+		}
+		return db_entries, 1, entries_per_elem
+	}
+
+	// use multiple Z_p elems to represent a single DB entry
+	ne := Compute_num_str_entries_base_p(p, row_length, Item_bits)
+	return N * ne, ne, 0
+}
+
+// Returns how many entries in Z_p are needed to represent an element in Z_q
+func Compute_num_str_entries_base_p(p, log_q uint64, Item_bits uint64) uint64 {
+	log_p := math.Log2(float64(p))
+	if log_q > 64 {
+		return uint64(math.Ceil(float64(64)/log_p) * math.Ceil(float64(log_q)/64))
+	}
+	return uint64(math.Ceil(float64(log_q) / log_p))
+}
+
 func avg(data []float64) float64 {
 	sum := 0.0
 	num := 0.0
@@ -130,4 +159,51 @@ func stddev(data []float64) float64 {
 	}
 	variance := sum / num // not -1!
 	return math.Sqrt(variance)
+}
+
+func stringToASCIIArray(s string) []uint64 {
+	var results []uint64
+	var result uint64
+	flag := 0
+	for _, char := range s {
+		if flag == 8 {
+			results = append(results, result)
+			result = 0
+			flag = 0
+		}
+		flag += 1
+		result = result*256 + uint64(char)
+	}
+	if result != 0 {
+		results = append(results, result)
+	}
+	return results
+}
+
+func intTostring(us []uint64) string {
+	var result string
+	for i := len(us) - 1; i >= 0; i-- {
+		for us[i]/256 != 0 {
+			result = string(byte(us[i]%256)) + result
+			us[i] = us[i] / 256
+		}
+		if us[i]%256 != 0 {
+			result = string(byte(us[i]%256)) + result
+		}
+	}
+	return result
+}
+
+func FindLongestElement(slice []string) string {
+	if len(slice) == 0 {
+		return "" // 切片为空时，返回空字符串或者你认为合适的默认值
+	}
+
+	longest := slice[0]
+	for _, str := range slice {
+		if len(str) > len(longest) {
+			longest = str
+		}
+	}
+	return longest
 }
