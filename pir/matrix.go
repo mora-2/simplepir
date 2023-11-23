@@ -48,6 +48,7 @@ func MatrixRand(rows uint64, cols uint64, logmod uint64, mod uint64) *Matrix {
 		m = big.NewInt(1 << logmod)
 	}
 	for i := 0; i < len(out.Data); i++ {
+
 		out.Data[i] = C.Elem(RandInt(m).Uint64())
 		// fmt.Println("len data:", len(out.Data), "\tindex:", i, "\tElem size:", unsafe.Sizeof(out.Data[i]))
 	}

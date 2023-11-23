@@ -1,12 +1,20 @@
 package pir
 
-import "time"
-import "fmt"
-import "os"
-import "bufio"
-import "math"
+import (
+	"bufio"
+	"fmt"
+	"math"
+	"os"
+	"time"
+)
 
 func printTime(start time.Time) time.Duration {
+	elapsed := time.Since(start)
+	fmt.Printf("\tElapsed: %s\n", elapsed)
+	return elapsed
+}
+
+func PrintTime(start time.Time) time.Duration {
 	elapsed := time.Since(start)
 	fmt.Printf("\tElapsed: %s\n", elapsed)
 	return elapsed

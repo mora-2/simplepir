@@ -116,6 +116,7 @@ func RunPIR(pi PIR, DB *Database, p Params, i []uint64) (float64, float64) {
 	bw := float64(0)
 
 	shared_state := pi.Init(DB.Info, p) // 根据数据库DB和LWE相关参数，创造A随机矩阵
+	fmt.Printf("shared_state.Data: %v\n", *shared_state.Data[0])
 
 	fmt.Println("Setup...")
 	start := time.Now()
