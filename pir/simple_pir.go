@@ -48,6 +48,42 @@ func (pi *SimplePIR) PickParams(N, d, n, logq uint64) Params {
 	return Params{}
 }
 
+func (pi *SimplePIR) PickStrParams(N, d, n, logq uint64) Params {
+	var Item_bits uint64 = 64
+
+	good_p := Params{}
+	found := false
+
+	// Iteratively refine p and DB dims, until find tight values
+	for mod_p := uint64(2); ; mod_p += 1 {
+		l, m := ApproxSquareStrDatabaseDims(N, d, mod_p, Item_bits) // 自增p，获得对应m
+
+		p := Params{
+			N:    n,
+			Logq: logq,
+			L:    l,
+			M:    m,
+		}
+		// 根据m选择加密参数
+		p.PickParams(false, m)
+
+		// found = true, 如果自增的p，超过了选择的P参数，说明最优的LWE加密参数以及对应的数据库l，m找到
+		if p.P < mod_p {
+			if !found {
+				panic("Error; should not happen")
+			}
+			good_p.PrintParams()
+			return good_p
+		}
+
+		good_p = p
+		found = true
+	}
+
+	panic("Cannot be reached")
+	return Params{}
+}
+
 func (pi *SimplePIR) PickParamsGivenDimensions(l, m, n, logq uint64) Params {
 	p := Params{
 		N:    n,

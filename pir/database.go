@@ -110,6 +110,20 @@ func ApproxSquareDatabaseDims(N, row_length, p uint64) (uint64, uint64) {
 	return l, m
 }
 
+func ApproxSquareStrDatabaseDims(N, row_length, p uint64, Item_bits uint64) (uint64, uint64) {
+	db_elems, elems_per_entry, _ := Num_StrDB_entries(N, row_length, p, Item_bits)
+	l := uint64(math.Floor(math.Sqrt(float64(db_elems))))
+
+	rem := l % elems_per_entry
+	if rem != 0 {
+		l += elems_per_entry - rem
+	}
+
+	m := uint64(math.Ceil(float64(db_elems) / float64(l)))
+
+	return l, m
+}
+
 // Find smallest l, m such that l*m >= N*ne and ne divides l, where ne is
 // the number of Z_p elements per DB entry determined by row_length and p, and m >=
 // lower_bound_m.

@@ -1,8 +1,10 @@
 package pir
 
 import (
+	"encoding/csv"
 	"fmt"
 	"math"
+	"os"
 )
 
 type State struct {
@@ -206,4 +208,46 @@ func FindLongestElement(slice []string) string {
 		}
 	}
 	return longest
+}
+
+func LoadFile(filepath, col_name string) []string {
+	// open .csv file
+	file, err := os.Open(filepath)
+	if err != nil {
+		fmt.Println("Error opening db file:", err)
+		return []string{}
+	}
+	defer file.Close()
+
+	// create CSV Reader
+	reader := csv.NewReader(file)
+
+	// read CSV
+	records, err := reader.ReadAll()
+	if err != nil {
+		fmt.Println("Error reading CSV:", err)
+		return []string{}
+	}
+
+	// get col index
+	col_name_Index := -1
+	headers := records[0]
+	for i, header := range headers {
+		if header == col_name {
+			col_name_Index = i
+			break
+		}
+	}
+
+	if col_name_Index == -1 {
+		fmt.Printf("Column '%v' not found in CSV.", col_name)
+		return []string{}
+	}
+
+	var col []string
+	// get data
+	for _, record := range records[1:] { // from line 2
+		col = append(col, record[col_name_Index])
+	}
+	return col
 }

@@ -103,11 +103,14 @@ func main() {
 	const SEC_PARAM = uint64(1 << 10) // secret demension
 
 	// db_vals := []uint64{141, 13, 52, 43, 44}
-	db_vals := []string{"apple", "banana", "cat", "dog"}
+	// db_vals := []string{"apple", "banana", "cat", "dog"}
+	filepath := "../../../data/data.csv"
+	db_vals := pir.LoadFile(filepath, "Child's First Name")
+
 	N := uint64(len(db_vals))
 	d := uint64(len(pir.FindLongestElement(db_vals)) * 8) // sizeof(byte): 8
 	pir_server := pir.SimplePIR{}
-	p := pir_server.PickParams(N, d, SEC_PARAM, LOGQ)
+	p := pir_server.PickStrParams(N, d, SEC_PARAM, LOGQ)
 
 	// DB loading
 	DB := pir.MakeStrDB(N, d, &p, db_vals)
