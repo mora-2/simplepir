@@ -142,6 +142,13 @@ func (pi *SimplePIR) Setup(DB *Database, shared State, p Params) (State, Msg) {
 	return MakeState(), MakeMsg(H)
 }
 
+func (pi *SimplePIR) SetupUnpackedDB(DB *Database, shared State, p Params) (State, Msg) {
+	A := shared.Data[0]
+	H := MatrixMul(DB.Data, A)
+
+	return MakeState(), MakeMsg(H)
+}
+
 func (pi *SimplePIR) MySetup(DB *Database, shared State, p Params) (State, Msg) {
 	A := shared.Data[0]
 	H := MyMatrixMul(DB.Data, DB.Info.Packing, A, uint64(1))
@@ -520,6 +527,13 @@ func (pi *SimplePIR) MyRecover(i []uint64, batch_index uint64, offline Msg, quer
 	// return ans
 }
 
+func (pi *SimplePIR) PackDB(DB *Database, p Params) {
+	// map the database entries to [0, p] (rather than [-p/1, p/2]) and then
+	// pack the database more tightly in memory, because the online computation
+	// is memory-bandwidth-bound
+	DB.Data.Add(p.P / 2)
+	DB.Squish()
+}
 func (pi *SimplePIR) Reset(DB *Database, p Params) {
 	// Uncompress the database, and map its entries to the range [-p/2, p/2].
 	DB.Unsquish()

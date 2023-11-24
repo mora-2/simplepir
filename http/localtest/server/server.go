@@ -26,7 +26,7 @@ func handleConnection(conn net.Conn, DB *pir.Database, pir_server *pir.SimplePIR
 
 	// 1. send shared_data help client construct matrix A
 	shared_state, shared_comp := pir_server.InitCompressed(DB.Info, p)
-	server_state, offline_download := pir_server.Setup(DB, shared_state, p) // 计算H矩阵，并将DB元素映射到[0，p]
+	server_state, offline_download := pir_server.SetupUnpackedDB(DB, shared_state, p) // 计算H矩阵，并将DB元素映射到[0，p]
 	shared_data := shared_data{
 		Info:             DB.Info,
 		P:                p,
@@ -62,9 +62,12 @@ func handleConnection(conn net.Conn, DB *pir.Database, pir_server *pir.SimplePIR
 	}
 	fmt.Println("1. Receice query.")
 
+	// pack DB
+	pir_server.PackDB(DB, p)
+
 	// 2. answer query
 	answer := pir_server.Answer(DB, query, server_state, shared_state, p) // ans = DB * qu
-	pir_server.Reset(DB, p)
+	pir_server.Reset(DB, p)                                               // unpack DB
 	encoder = json.NewEncoder(conn)
 	err = encoder.Encode(answer)
 	if err != nil {
@@ -94,9 +97,10 @@ func handleConnection(conn net.Conn, DB *pir.Database, pir_server *pir.SimplePIR
 }
 
 func main() {
+	fmt.Println("--------------pre loading-------------")
 	// server params config
-	const LOGQ = uint64(32)          // ciphertext mod
-	const SEC_PARAM = uint64(1 << 2) // secret demension
+	const LOGQ = uint64(32)           // ciphertext mod
+	const SEC_PARAM = uint64(1 << 10) // secret demension
 
 	// db_vals := []uint64{141, 13, 52, 43, 44}
 	db_vals := []string{"apple", "banana", "cat", "dog"}

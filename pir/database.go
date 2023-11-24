@@ -153,8 +153,8 @@ func SetupDB(Num, row_length uint64, p *Params) *Database {
 		D.Info.X += 1
 	}
 
-	D.Info.Basis = 0
-	D.Info.Squishing = 0
+	D.Info.Basis = 10
+	D.Info.Squishing = 3
 
 	fmt.Printf("Total packed DB size is ~%f MB\n",
 		float64(p.L*p.M)*math.Log2(float64(p.P))/(1024.0*1024.0*8.0))
@@ -183,6 +183,7 @@ func MakeRandomDB(Num, row_length uint64, p *Params) *Database {
 func MakeDB(Num, row_length uint64, p *Params, vals []uint64) *Database {
 	D := SetupDB(Num, row_length, p)
 	D.Data = MatrixZeros(p.L, p.M)
+	D.Info.Cols = D.Data.Cols
 
 	if uint64(len(vals)) != Num {
 		panic("Bad input DB")
@@ -227,6 +228,7 @@ func MakeStrDB(Num, row_length uint64, p *Params, svals []string) *Database {
 
 	D := SetupStrDB(Num, row_length, p)
 	D.Data = MatrixZeros(p.L, p.M)
+	D.Info.Cols = D.Data.Cols
 
 	if uint64(len(vals)) != Num {
 		panic("Bad input DB")
@@ -283,8 +285,8 @@ func SetupStrDB(Num, row_length uint64, p *Params) *Database {
 		D.Info.X += 1
 	}
 
-	D.Info.Basis = 0
-	D.Info.Squishing = 0
+	D.Info.Basis = 10
+	D.Info.Squishing = 3
 
 	fmt.Printf("Total packed DB size is ~%f MB\n",
 		float64(p.L*p.M)*math.Log2(float64(p.P))/(1024.0*1024.0*8.0))
