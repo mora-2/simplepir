@@ -36,8 +36,17 @@ func main() {
 
 	// 1. get shared_data from server response
 	var shared_data shared_data
-	decoder := json.NewDecoder(conn)
-	err = decoder.Decode(&shared_data)
+	file1, err1 := os.Open("../server/shared_data")
+    if err1 != nil {
+        fmt.Println(err1)
+        return
+    }
+    decoder := json.NewDecoder(file1)
+    err1 = decoder.Decode(&shared_data)
+    if err1 != nil {
+        fmt.Println(err1)
+        return
+    }
 	if err != nil {
 		fmt.Println("Error decoding shared_data:", err.Error())
 		return
