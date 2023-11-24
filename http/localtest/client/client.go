@@ -10,15 +10,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mora-2/simplepir/http/localtest/server/config"
 	"github.com/mora-2/simplepir/pir"
 )
 
-type shared_data struct {
-	Info             pir.DBinfo
-	P                pir.Params
-	Comp             pir.CompressedState
-	Offline_download pir.Msg
-}
+var shared_file_path string = "./data/shared_data"
 
 func main() {
 	conn, err := net.Dial("tcp", "localhost:8080")
@@ -32,21 +28,17 @@ func main() {
 	client_pir := pir.SimplePIR{}
 
 	/*-------------offline pahse-------------*/
-	fmt.Println("-------------offline pahse-------------")
+	fmt.Println("-------------offline pahse start-------------")
 
 	// 1. get shared_data from server response
-	var shared_data shared_data
-	file1, err1 := os.Open("../server/shared_data")
-    if err1 != nil {
-        fmt.Println(err1)
-        return
-    }
-    decoder := json.NewDecoder(file1)
-    err1 = decoder.Decode(&shared_data)
-    if err1 != nil {
-        fmt.Println(err1)
-        return
-    }
+	var shared_data config.Shared_data
+	shared_file, err := os.Open(shared_file_path) // assume the file has been downloaded
+	if err != nil {
+		fmt.Println("Error opening shared_file:", err)
+		return
+	}
+	decoder := json.NewDecoder(shared_file)
+	err = decoder.Decode(&shared_data)
 	if err != nil {
 		fmt.Println("Error decoding shared_data:", err.Error())
 		return
@@ -57,14 +49,11 @@ func main() {
 	shared_state := client_pir.DecompressState(shared_data.Info, shared_data.P, shared_data.Comp)
 	// fmt.Printf("shared_state.Data[0]: %v\n", shared_state.Data[0])
 
-	{
-		_ = shared_state
-	}
-	fmt.Println("-------------offline pahse-------------")
+	fmt.Println("-------------offline pahse end-------------")
 	/*-------------offline pahse-------------*/
 
 	/*--------------online pahse-------------*/
-	fmt.Println("--------------online pahse-------------")
+	fmt.Println("--------------online pahse start-------------")
 
 	// Scan query_index
 	query_index := []uint64{}
@@ -138,7 +127,7 @@ func main() {
 	fmt.Println("3. Resconstruction finished.")
 	fmt.Printf("SimplePIR result: %v\n", result)
 
-	fmt.Println("--------------online pahse-------------")
+	fmt.Println("--------------online pahse end-------------")
 	/*--------------online pahse-------------*/
 
 	// // 4. send query_index
