@@ -5,10 +5,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mora-2/simplepir/http/localtest/server/config"
 	"github.com/mora-2/simplepir/pir"
@@ -18,18 +20,29 @@ var shared_file_path string = "./data/shared_data"
 
 func main() {
 	conn, err := net.Dial("tcp", "localhost:8080")
+	// conn, err := net.Dial("tcp", "219.245.186.116:8080")
 	if err != nil {
 		fmt.Println("Error connecting:", err.Error())
 		return
 	}
 	defer conn.Close()
 
+	//create log file
+	logFile, err := os.Create("log.txt")
+	if err != nil {
+		log.Fatal("Cannot create log file: ", err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+
 	// create client_pir
 	client_pir := pir.SimplePIR{}
 
-	/*-------------offline pahse-------------*/
-	fmt.Println("-------------offline pahse start-------------")
+	/*-------------offline phase-------------*/
+	fmt.Println("-------------offline phase start-------------")
 
+	// start time
+	start := time.Now()
 	// 1. get shared_data from server response
 	var shared_data config.Shared_data
 	shared_file, err := os.Open(shared_file_path) // assume the file has been downloaded
@@ -47,13 +60,15 @@ func main() {
 
 	// decompress shared_data
 	shared_state := client_pir.DecompressState(shared_data.Info, shared_data.P, shared_data.Comp)
-	// fmt.Printf("shared_state.Data[0]: %v\n", shared_state.Data[0])
 
-	fmt.Println("-------------offline pahse end-------------")
-	/*-------------offline pahse-------------*/
+	// log out
+	log.Printf("Offline phase        \t\tElapsed:%v \tOffline download(hint):%vKB", pir.PrintTime(start),
+		float64(shared_data.Offline_download.Size()*uint64(shared_data.P.Logq)/(8.0*1024.0)))
+	fmt.Println("-------------offline phase end-------------")
+	/*-------------offline phase-------------*/
 
-	/*--------------online pahse-------------*/
-	fmt.Println("--------------online pahse start-------------")
+	/*--------------online phase-------------*/
+	fmt.Println("--------------online phase start-------------")
 
 	// Scan query_index
 	query_index := []uint64{}
@@ -76,9 +91,9 @@ func main() {
 		}
 		query_index = append(query_index, num)
 	}
-	// fmt.Printf("query_index: %v\n", query_index)
 
 	// 1. build query
+	start = time.Now()
 	var client_state []pir.State // holding secrets
 	var query pir.MsgSlice       // holding queries
 	for index, _ := range query_index {
@@ -96,8 +111,16 @@ func main() {
 		return
 	}
 	fmt.Println("1. Send built query.")
+	fmt.Printf("\tquery.Data[0].Data[0].Rows: %v\n", query.Data[0].Data[0].Rows)
+	fmt.Printf("\tquery.Data[0].Data[0].Cols: %v\n", query.Data[0].Data[0].Cols)
+	fmt.Printf("\tquery.Data[0].Data[0].Data[:5]: %v\n", query.Data[0].Data[0].Data[:5])
+
+	// log out
+	log.Printf("Online phase(1. Build query)    \tElapsed:%v   \tupload:%vKB", pir.PrintTime(start),
+		float64(query.Size()*uint64(shared_data.P.Logq)/(8.0*1024.0)))
 
 	// 2. Receive answer
+	start = time.Now()
 	var answer pir.Msg
 	decoder = json.NewDecoder(conn)
 	err = decoder.Decode(&answer)
@@ -106,9 +129,16 @@ func main() {
 		return
 	}
 	fmt.Println("2. Receive answer.")
-	// fmt.Printf("answer.Data[0]: %v\n", answer.Data[0])
+	fmt.Printf("\tanswer.Data[0].Rows: %v\n", answer.Data[0].Rows)
+	fmt.Printf("\tanswer.Data[0].Cols: %v\n", answer.Data[0].Cols)
+	fmt.Printf("\tanswer.Data[0].Data[:5]: %v\n", answer.Data[0].Data[:5])
+
+	// log out
+	log.Printf("Online phase(2. Receive answer) \tElapsed:%v \tdownloadload:%vKB", pir.PrintTime(start),
+		float64(answer.Size()*uint64(shared_data.P.Logq)/(8.0*1024.0)))
 
 	// 3. Resconstruction
+	start = time.Now()
 	var result []string
 	for index, _ := range query_index {
 		// index_to_query := i[index] + uint64(index)*batch_sz
@@ -117,25 +147,13 @@ func main() {
 			query.Data[index], answer, shared_state,
 			client_state[index], shared_data.P, shared_data.Info) // 返回指定下标的元素
 		result = append(result, val)
-		// if DB.GetElem(index_to_query) != val {
-		// 	fmt.Printf("Batch %d (querying index %d -- row should be >= %d): Got %d instead of %d\n",
-		// 		index, index_to_query, DB.Data.Rows/4, val, DB.GetElem(index_to_query))
-		// 	panic("Reconstruct failed!")
-		// }
-		// fmt.Println("Simple PIR ---- Query Element Index:", index_to_query, "\tElement in Database:", DB.GetElem(index_to_query), "\tGet Element:", val)
 	}
 	fmt.Println("3. Resconstruction finished.")
-	fmt.Printf("SimplePIR result: %v\n", result)
+	fmt.Printf("\tSimplePIR result: %v\n", result)
 
-	fmt.Println("--------------online pahse end-------------")
-	/*--------------online pahse-------------*/
+	// log out
+	log.Printf("Online phase(3. Resconstruction) \tElapsed:%v", pir.PrintTime(start))
 
-	// // 4. send query_index
-	// encoder = json.NewEncoder(conn)
-	// err = encoder.Encode(query_index)
-	// if err != nil {
-	// 	fmt.Println("Error encoding query_index:", err.Error())
-	// 	return
-	// }
-	// fmt.Println("4. send query_index.")
+	fmt.Println("--------------online phase end-------------")
+	/*--------------online phase-------------*/
 }

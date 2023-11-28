@@ -17,16 +17,16 @@ import (
 func handleConnection(conn net.Conn, DB *pir.Database, server_state pir.State, shared_state pir.State, pir_server *pir.SimplePIR, p pir.Params) {
 	defer conn.Close()
 
-	/*-------------offline pahse-------------*/
-	fmt.Println("-------------offline pahse start-------------")
+	/*-------------offline phase-------------*/
+	fmt.Println("-------------offline phase start-------------")
 
 	fmt.Println("assuming data has trasfered.")
 
-	fmt.Println("-------------offline pahse end-------------")
-	/*-------------offline pahse-------------*/
+	fmt.Println("-------------offline phase end-------------")
+	/*-------------offline phase-------------*/
 
-	/*--------------online pahse-------------*/
-	fmt.Println("--------------online pahse start-------------")
+	/*--------------online phase-------------*/
+	fmt.Println("--------------online phase start-------------")
 
 	// 1. receive query
 	var query pir.MsgSlice
@@ -36,7 +36,7 @@ func handleConnection(conn net.Conn, DB *pir.Database, server_state pir.State, s
 		fmt.Println("Error decoding JSON:", err.Error())
 		return
 	}
-	fmt.Println("1. Receice query.")
+	fmt.Println("1. Receive query.")
 
 	// pack DB
 	pir_server.PackDB(DB, p)
@@ -51,25 +51,10 @@ func handleConnection(conn net.Conn, DB *pir.Database, server_state pir.State, s
 		return
 	}
 	fmt.Println("2. Send answer.")
-	// fmt.Printf("answer.Data[0]: %v\n", answer.Data[0])
 
-	fmt.Println("--------------online pahse end-------------")
-	/*--------------online pahse-------------*/
+	fmt.Println("--------------online phase end-------------")
+	/*--------------online phase-------------*/
 
-	// // 3. Answer check
-	// query_index := []uint64{}
-	// decoder = json.NewDecoder(conn)
-	// err = decoder.Decode(&query_index)
-	// if err != nil {
-	// 	fmt.Println("Error decoding query_index:", err.Error())
-	// 	return
-	// }
-
-	// result := []uint64{}
-	// for _, value := range query_index { // get elem in DB
-	// 	result = append(result, DB.GetElem(value))
-	// }
-	// fmt.Printf("SimplePIR result in DB:%+v\n", result)
 }
 
 func main() {
