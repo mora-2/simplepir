@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	// "runtime"
-	// "time"
-
 	"github.com/mora-2/simplepir/http/server/config"
 	"github.com/mora-2/simplepir/pir"
 )
