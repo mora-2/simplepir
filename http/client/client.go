@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mora-2/simplepir/http/localtest/client/config"
+	"github.com/mora-2/simplepir/http/client/config"
 	"github.com/mora-2/simplepir/pir"
 )
 
@@ -22,6 +22,7 @@ var offline_file_path string = "./data/offline_data"
 var log_file_path string = "log.txt"
 
 func main() {
+	// ip config
 	ip_file, err := os.Open(ip_config_file_path)
 	if err != nil {
 		fmt.Println("Error loading ip_config.json:", err.Error())
@@ -35,7 +36,7 @@ func main() {
 		fmt.Println("Error decoding ip_config:", err.Error())
 	}
 
-	ip_addr := ip_cfg.Ip + ":" + fmt.Sprint(ip_cfg.Port)
+	ip_addr := ip_cfg.IpAddr + ":" + fmt.Sprint(ip_cfg.OnlinePort)
 	conn, err := net.Dial("tcp", ip_addr)
 	if err != nil {
 		fmt.Println("Error connecting:", err.Error())
@@ -52,7 +53,7 @@ func main() {
 	log.SetOutput(logFile)
 
 	/*--------------pre loading start-------------*/
-
+	fmt.Printf("\rLoading...")
 	offline_file, err := os.Open(offline_file_path)
 	if err != nil {
 		fmt.Println("Error opening offline_data file:", err.Error())
@@ -68,6 +69,7 @@ func main() {
 
 	// create client_pir
 	client_pir := pir.SimplePIR{}
+	fmt.Printf("\rData loaded.\n")
 	/*--------------pre loading end-------------*/
 
 	/*--------------online phase-------------*/

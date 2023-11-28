@@ -19,3 +19,8 @@ type Pre_computed_data struct {
 	Pir_server   pir.SimplePIR
 	P            pir.Params
 }
+
+type IP_Conn struct {
+	OnlinePort  uint32
+	OfflinePort uint32
+}

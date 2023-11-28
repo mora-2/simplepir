@@ -20,6 +20,7 @@ type Offline_data struct {
 }
 
 type IP_Conn struct {
-	Ip   string
-	Port uint32
+	IpAddr      string
+	OnlinePort  uint32
+	OfflinePort uint32
 }

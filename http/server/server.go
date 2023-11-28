@@ -9,15 +9,12 @@ import (
 	"os"
 	"time"
 
-	// "runtime"
-	// "time"
-
-	"github.com/mora-2/simplepir/http/localtest/server/config"
+	"github.com/mora-2/simplepir/http/server/config"
 	"github.com/mora-2/simplepir/pir"
 )
 
 var program = "server.go"
-var port uint32 = 8080
+var ip_config_file_path string = "./config/ip_config.json"
 var pre_comp_file_path string = "./data/pre_computed_data"
 var log_file_path string = "log.txt"
 
@@ -66,6 +63,19 @@ func handleConnection(conn net.Conn, DB *pir.Database, server_state pir.State, s
 }
 
 func main() {
+	// ip config
+	ip_file, err := os.Open(ip_config_file_path)
+	if err != nil {
+		fmt.Println("Error loading ip_config.json:", err.Error())
+	}
+	defer ip_file.Close()
+
+	var ip_cfg config.IP_Conn
+	decoder := json.NewDecoder(ip_file)
+	err = decoder.Decode(&ip_cfg)
+	if err != nil {
+		fmt.Println("Error decoding ip_config:", err.Error())
+	}
 	//create log file
 	logFile, err := os.Create(log_file_path)
 	if err != nil {
@@ -83,7 +93,7 @@ func main() {
 		fmt.Println("Error opening pre_computed_file:", err.Error())
 		return
 	}
-	decoder := json.NewDecoder(pc_file)
+	decoder = json.NewDecoder(pc_file)
 	var pre_computed_data config.Pre_computed_data
 	err = decoder.Decode(&pre_computed_data)
 	if err != nil {
@@ -96,16 +106,17 @@ func main() {
 	pre_computed_data.Pir_server.PackDB(pre_computed_data.DB, pre_computed_data.P)
 
 	log.Printf("[%v][Pre loading]\t Elapsed:%v\t", program, time.Since(start))
+	fmt.Printf("\rData loaded.\n")
 	/*--------------pre loading end-------------*/
 
 	// start listening
-	listener, err := net.Listen("tcp", ":"+fmt.Sprint(port))
+	listener, err := net.Listen("tcp", ":"+fmt.Sprint(ip_cfg.OnlinePort))
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		return
 	}
 	defer listener.Close()
-	fmt.Println("\rServer listening on :" + fmt.Sprint(port))
+	fmt.Println("Server listening on :" + fmt.Sprint(ip_cfg.OnlinePort))
 
 	for {
 		conn, err := listener.Accept()

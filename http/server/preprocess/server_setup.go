@@ -9,18 +9,19 @@ import (
 	// "runtime"
 	// "time"
 
-	"github.com/mora-2/simplepir/http/localtest/server/config"
+	"github.com/mora-2/simplepir/http/server/config"
 	"github.com/mora-2/simplepir/pir"
 )
+
+var data_file_path string = "../../../data/data.csv"
+var shared_data_file_path string = "../data/shared_data"
+var pre_computed_data_file_path string = "../data/pre_computed_data"
 
 func main() {
 	// server params config
 	const LOGQ = uint64(32)           // ciphertext mod
 	const SEC_PARAM = uint64(1 << 10) // secret demension
 
-	// db_vals := []uint64{141, 13, 52, 43, 44}
-	//db_vals := []string{"apple", "banana", "cat", "dog"}
-	data_file_path := "../../../../data/data.csv"
 	db_vals := pir.LoadFile(data_file_path, "Child's First Name")
 	N := uint64(len(db_vals))
 	d := uint64(len(pir.FindLongestElement(db_vals)) * 8) // sizeof(byte): 8
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	// offline: send shared_data
-	shared_data_file, err := os.Create("../data/shared_data")
+	shared_data_file, err := os.Create(shared_data_file_path)
 	if err != nil {
 		fmt.Println("Error creating shared_data_file:", err.Error())
 	}
@@ -66,7 +67,7 @@ func main() {
 	}
 
 	// save pre_computed_data
-	pre_computed_data_file, err := os.Create("../data/pre_computed_data")
+	pre_computed_data_file, err := os.Create(pre_computed_data_file_path)
 	if err != nil {
 		fmt.Println("Error creating pre_computed_data_file:", err.Error())
 	}
