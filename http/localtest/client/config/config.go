@@ -1,13 +1,25 @@
 // client.go
-package main
+package config
 
 import (
 	"github.com/mora-2/simplepir/pir"
 )
 
-type shared_data struct {
+type Shared_data struct {
 	Info             pir.DBinfo
 	P                pir.Params
 	Comp             pir.CompressedState
 	Offline_download pir.Msg
+}
+
+type Offline_data struct {
+	Info             pir.DBinfo
+	P                pir.Params
+	Shared_state     pir.State
+	Offline_download pir.Msg
+}
+
+type IP_Conn struct {
+	Ip   string
+	Port uint32
 }

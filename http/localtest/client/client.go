@@ -12,15 +12,31 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mora-2/simplepir/http/localtest/server/config"
+	"github.com/mora-2/simplepir/http/localtest/client/config"
 	"github.com/mora-2/simplepir/pir"
 )
 
-var shared_file_path string = "./data/shared_data"
+var program string = "client.go"
+var ip_config_file_path string = "./config/ip_config.json"
+var offline_file_path string = "./data/offline_data"
+var log_file_path string = "log.txt"
 
 func main() {
-	conn, err := net.Dial("tcp", "localhost:8080")
-	// conn, err := net.Dial("tcp", "219.245.186.116:8080")
+	ip_file, err := os.Open(ip_config_file_path)
+	if err != nil {
+		fmt.Println("Error loading ip_config.json:", err.Error())
+	}
+	defer ip_file.Close()
+
+	var ip_cfg config.IP_Conn
+	decoder := json.NewDecoder(ip_file)
+	err = decoder.Decode(&ip_cfg)
+	if err != nil {
+		fmt.Println("Error decoding ip_config:", err.Error())
+	}
+
+	ip_addr := ip_cfg.Ip + ":" + fmt.Sprint(ip_cfg.Port)
+	conn, err := net.Dial("tcp", ip_addr)
 	if err != nil {
 		fmt.Println("Error connecting:", err.Error())
 		return
@@ -28,44 +44,31 @@ func main() {
 	defer conn.Close()
 
 	//create log file
-	logFile, err := os.Create("log.txt")
+	logFile, err := os.OpenFile(log_file_path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatal("Cannot create log file: ", err)
+		log.Fatal("Cannot create log file: ", err.Error())
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
+	/*--------------pre loading start-------------*/
+
+	offline_file, err := os.Open(offline_file_path)
+	if err != nil {
+		fmt.Println("Error opening offline_data file:", err.Error())
+	}
+	defer offline_file.Close()
+
+	var offline_data config.Offline_data
+	decoder = json.NewDecoder(offline_file)
+	err = decoder.Decode(&offline_data)
+	if err != nil {
+		fmt.Println("Error loading offline_data:", err.Error())
+	}
+
 	// create client_pir
 	client_pir := pir.SimplePIR{}
-
-	/*-------------offline phase-------------*/
-	fmt.Println("-------------offline phase start-------------")
-
-	// start time
-	start := time.Now()
-	// 1. get shared_data from server response
-	var shared_data config.Shared_data
-	shared_file, err := os.Open(shared_file_path) // assume the file has been downloaded
-	if err != nil {
-		fmt.Println("Error opening shared_file:", err)
-		return
-	}
-	decoder := json.NewDecoder(shared_file)
-	err = decoder.Decode(&shared_data)
-	if err != nil {
-		fmt.Println("Error decoding shared_data:", err.Error())
-		return
-	}
-	fmt.Println("1. Receive shared_data.")
-
-	// decompress shared_data
-	shared_state := client_pir.DecompressState(shared_data.Info, shared_data.P, shared_data.Comp)
-
-	// log out
-	log.Printf("Offline phase        \t\tElapsed:%v \tOffline download(hint):%vKB", pir.PrintTime(start),
-		float64(shared_data.Offline_download.Size()*uint64(shared_data.P.Logq)/(8.0*1024.0)))
-	fmt.Println("-------------offline phase end-------------")
-	/*-------------offline phase-------------*/
+	/*--------------pre loading end-------------*/
 
 	/*--------------online phase-------------*/
 	fmt.Println("--------------online phase start-------------")
@@ -74,11 +77,11 @@ func main() {
 	query_index := []uint64{}
 
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Printf("Input the indexes you want to query([0-%v]):", shared_data.Info.Num-1)
+	fmt.Printf("Input the indexes you want to query([0-%v]):", offline_data.Info.Num-1)
 	scanner.Scan()
 	input_str := scanner.Text()
 	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading Input the indexes:", err)
+		fmt.Println("Error reading Input the indexes:", err.Error())
 		return
 	}
 
@@ -86,20 +89,20 @@ func main() {
 	for _, numStr := range input_slice { // convert str into uint64
 		num, err := strconv.ParseUint(numStr, 10, 64)
 		if err != nil {
-			fmt.Printf("Error converting %s to uint64: %v\n", numStr, err)
+			fmt.Printf("Error converting %s to uint64: %v\n", numStr, err.Error())
 			continue
 		}
 		query_index = append(query_index, num)
 	}
 
 	// 1. build query
-	start = time.Now()
+	start := time.Now()
 	var client_state []pir.State // holding secrets
 	var query pir.MsgSlice       // holding queries
 	for index, _ := range query_index {
 		// index_to_query := i[index] + uint64(index)*batch_sz
 		index_to_query := query_index[index]
-		cs, q := client_pir.Query(index_to_query, shared_state, shared_data.P, shared_data.Info) // 依次制作query语句，qu = As + e + ΔUi
+		cs, q := client_pir.Query(index_to_query, offline_data.Shared_state, offline_data.P, offline_data.Info) // 依次制作query语句，qu = As + e + ΔUi
 		client_state = append(client_state, cs)
 		query.Data = append(query.Data, q)
 	}
@@ -116,8 +119,8 @@ func main() {
 	fmt.Printf("\tquery.Data[0].Data[0].Data[:5]: %v\n", query.Data[0].Data[0].Data[:5])
 
 	// log out
-	log.Printf("Online phase(1. Build query)    \tElapsed:%v   \tupload:%vKB", pir.PrintTime(start),
-		float64(query.Size()*uint64(shared_data.P.Logq)/(8.0*1024.0)))
+	log.Printf("[%v][%v][1. Send built query]\t Elapsed:%v \tSize:%vKB", program, conn.LocalAddr(),
+		pir.PrintTime(start), float64(query.Size()*uint64(offline_data.P.Logq)/(8.0*1024.0)))
 
 	// 2. Receive answer
 	start = time.Now()
@@ -134,8 +137,8 @@ func main() {
 	fmt.Printf("\tanswer.Data[0].Data[:5]: %v\n", answer.Data[0].Data[:5])
 
 	// log out
-	log.Printf("Online phase(2. Receive answer) \tElapsed:%v \tdownloadload:%vKB", pir.PrintTime(start),
-		float64(answer.Size()*uint64(shared_data.P.Logq)/(8.0*1024.0)))
+	log.Printf("[%v][%v][2. Receive answer]\t Elapsed:%v \tSize:%vKB", program, conn.LocalAddr(),
+		pir.PrintTime(start), float64(answer.Size()*uint64(offline_data.P.Logq)/(8.0*1024.0)))
 
 	// 3. Resconstruction
 	start = time.Now()
@@ -143,16 +146,16 @@ func main() {
 	for index, _ := range query_index {
 		// index_to_query := i[index] + uint64(index)*batch_sz
 		index_to_query := query_index[index]
-		val := client_pir.StrRecover(index_to_query, uint64(index), shared_data.Offline_download,
-			query.Data[index], answer, shared_state,
-			client_state[index], shared_data.P, shared_data.Info) // 返回指定下标的元素
+		val := client_pir.StrRecover(index_to_query, uint64(index), offline_data.Offline_download,
+			query.Data[index], answer, offline_data.Shared_state,
+			client_state[index], offline_data.P, offline_data.Info) // 返回指定下标的元素
 		result = append(result, val)
 	}
 	fmt.Println("3. Resconstruction finished.")
 	fmt.Printf("\tSimplePIR result: %v\n", result)
 
 	// log out
-	log.Printf("Online phase(3. Resconstruction) \tElapsed:%v", pir.PrintTime(start))
+	log.Printf("[%v][%v][3. Resconstruction]\t Elapsed:%v", program, conn.LocalAddr(), pir.PrintTime(start))
 
 	fmt.Println("--------------online phase end-------------")
 	/*--------------online phase-------------*/

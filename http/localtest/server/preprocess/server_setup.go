@@ -49,37 +49,37 @@ func main() {
 	}
 
 	// offline: send shared_data
-	shared_data_file, err := os.Create("../../client/data/shared_data")
+	shared_data_file, err := os.Create("../data/shared_data")
 	if err != nil {
-		fmt.Println("Error creating shared_data_file:", err)
+		fmt.Println("Error creating shared_data_file:", err.Error())
 	}
 	defer func() {
 		if cerr := shared_data_file.Close(); cerr != nil {
-			fmt.Println("Error closing shared_data_file:", cerr)
+			fmt.Println("Error closing shared_data_file:", cerr.Error())
 
 		}
 	}()
 	encoder := json.NewEncoder(shared_data_file)
 	err = encoder.Encode(shared_data)
 	if err != nil {
-		fmt.Println("Error encoding shared_data_file:", err)
+		fmt.Println("Error encoding shared_data_file:", err.Error())
 	}
 
 	// save pre_computed_data
-	pre_computed_data_file, err := os.Create("./data/pre_computed_data")
+	pre_computed_data_file, err := os.Create("../data/pre_computed_data")
 	if err != nil {
-		fmt.Println("Error creating pre_computed_data_file:", err)
+		fmt.Println("Error creating pre_computed_data_file:", err.Error())
 	}
 	defer func() {
 		if cerr := pre_computed_data_file.Close(); cerr != nil {
-			fmt.Println("Error closing pre_computed_data:", cerr)
+			fmt.Println("Error closing pre_computed_data:", cerr.Error())
 
 		}
 	}()
 	encoder = json.NewEncoder(pre_computed_data_file)
 	err = encoder.Encode(pre_computed_data)
 	if err != nil {
-		fmt.Println("Error encoding pre_computed_data_file:", err)
+		fmt.Println("Error encoding pre_computed_data_file:", err.Error())
 	}
 
 }
