@@ -276,6 +276,49 @@ func MakeStrDB(Num, row_length uint64, p *Params, svals []string) *Database {
 	return D
 }
 
+func MakeStrDB_bytes(Num, row_length uint64, p *Params, svals []string) *Database {
+	var vals [][]uint64 = make([][]uint64, len(svals))
+	for i := 0; i < len(svals); i++ {
+		val_bytes := []byte(svals[i])
+		vals[i] = bytesToASCIIArray(val_bytes)
+	}
+
+	D := SetupStrDB(Num, row_length, p)
+	D.Data = MatrixZeros(p.L, p.M)
+	D.Info.Cols = D.Data.Cols
+
+	if uint64(len(vals)) != Num {
+		panic("Bad input DB")
+	}
+
+	if D.Info.Packing > 0 {
+		// Pack multiple DB elems into each Z_p elem
+		panic("MakeStrDB D.Info.Packing > 0!")
+	} else {
+		// Use multiple Z_p elems to represent each DB elem
+		for i, elem := range vals {
+			for j, k, n := uint64(0), uint64(0), uint64(0); j < D.Info.Ne; j++ {
+				D.Data.Set(Base_p(D.Info.P, elem[k], n), (uint64(i)/p.M)*D.Info.Ne+j, uint64(i)%p.M)
+				n = n + 1
+				// float64(64) string packed into [][]uint64
+				// n: n-th representation of elem[k] based on p.P
+				if n == uint64(math.Ceil(float64(D.Info.Item_bits)/math.Log2(float64(p.P)))) {
+					n = 0
+					k += 1
+					if int(k) == len(elem) && (j+1) != D.Info.Ne { // pad the last elem[k], for each len(elem) is not equal
+						elem = append(elem, 0)
+					}
+				}
+			}
+		}
+	}
+
+	// Map DB elems to [-p/2; p/2]
+	D.Data.Sub(p.P / 2)
+
+	return D
+}
+
 func SetupStrDB(Num, row_length uint64, p *Params) *Database {
 	if (Num == 0) || (row_length == 0) {
 		panic("Empty database!")
