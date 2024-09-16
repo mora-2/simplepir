@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-
+	"bufio"
 	"github.com/mora-2/simplepir/http/server/config"
 	"github.com/mora-2/simplepir/pir"
 )
@@ -13,20 +13,22 @@ import (
 var data_file_path string = "../../../data/data.csv"
 var shared_data_file_path string = "../data/shared_data"
 var pre_computed_data_file_path string = "../data/pre_computed_data"
+var large_data_file_path string = "/home/nsklab/yyh/similar/tiptoe/search/mydata/data/rank_result/facts.txt"
 
 func main() {
 	// server params config
 	const LOGQ = uint64(32)           // ciphertext mod
 	const SEC_PARAM = uint64(1 << 10) // secret demension
 
-	db_vals := pir.LoadFile(data_file_path, "Child's First Name")
+	db_vals := readLines(large_data_file_path)
 	N := uint64(len(db_vals))
-	d := uint64(len(pir.FindLongestElement(db_vals)) * 8) // sizeof(byte): 8
+	d := uint64(pir.FindLongestElement(db_vals) * 8) // sizeof(byte): 8
+	print("\nd:",d,"\n")
 	pir_server := pir.SimplePIR{}
 	p := pir_server.PickStrParams(N, d, SEC_PARAM, LOGQ)
 
 	// DB loading
-	DB := pir.MakeStrDB(N, d, &p, db_vals)
+	DB := pir.MakeStrDB_bytes(N, d, &p, db_vals)
 
 	// create A, H
 	shared_state, shared_comp := pir_server.InitCompressed(DB.Info, p)
@@ -80,4 +82,23 @@ func main() {
 		fmt.Println("Error encoding pre_computed_data_file:", err.Error())
 	}
 
+}
+
+func readLines(filename string) []string {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+  
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil
+	}
+  
+	return lines
 }

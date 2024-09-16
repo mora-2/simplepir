@@ -83,7 +83,7 @@ func main() {
 	fmt.Printf("\rData loaded.\n")
 
 	// start listening
-	listener, err := net.Listen("tcp", ":"+fmt.Sprint(ip_cfg.OfflinePort))
+	listener, err := net.Listen("tcp", "219.245.186.51"+":"+fmt.Sprint(ip_cfg.OfflinePort))
 	if err != nil {
 		fmt.Println("Error listening:", err.Error())
 		return

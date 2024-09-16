@@ -1,0 +1,6 @@
+2024/04/03 10:45:40 [client_offline.go][192.168.159.131:56574][1.1 Receive shared_data]	 Elapsed:9m21.133473089s
+2024/04/03 10:45:59 [client_offline.go][192.168.159.131:56574][1.2 Decompress]	 Elapsed:18.574832169s
+2024/04/03 10:48:54 [client_offline.go][192.168.159.131:56574][2 Write]	 Elapsed:2m54.610837014s
+2024/04/11 10:57:25 [client_offline.go][192.168.159.131:42492][1.1 Receive shared_data]	 Elapsed:12m44.83362404s
+2024/04/11 10:57:46 [client_offline.go][192.168.159.131:42492][1.2 Decompress]	 Elapsed:21.248735156s
+2024/04/11 11:00:23 [client_offline.go][192.168.159.131:42492][2 Write]	 Elapsed:2m37.209305518s

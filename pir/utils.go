@@ -182,32 +182,55 @@ func stringToASCIIArray(s string) []uint64 {
 	return results
 }
 
+func bytesToASCIIArray(s []byte) []uint64 {
+	var results []uint64
+	var result uint64
+	flag := 0
+	for _, char := range s {
+		if flag == 8 {
+			results = append(results, result)
+			result = 0
+			flag = 0
+		}
+		flag += 1
+		result = result*256 + uint64(char)
+	}
+	if result != 0 {
+		results = append(results, result)
+	}
+	return results
+}
+
 func intTostring(us []uint64) string {
+	var b []byte
 	var result string
 	for i := len(us) - 1; i >= 0; i-- {
 		for us[i]/256 != 0 {
+			b = append([]byte{byte(us[i] % 256)}, b...)
 			result = string(byte(us[i]%256)) + result
 			us[i] = us[i] / 256
 		}
 		if us[i]%256 != 0 {
+			b = append([]byte{byte(us[i] % 256)}, b...)
 			result = string(byte(us[i]%256)) + result
 		}
 	}
-	return result
+	return string(b)
 }
 
-func FindLongestElement(slice []string) string {
+func FindLongestElement(slice []string) int {
 	if len(slice) == 0 {
-		return "" // 切片为空时，返回空字符串或者你认为合适的默认值
+		return 0 // 切片为空时，返回空字符串或者你认为合适的默认值
 	}
 
-	longest := slice[0]
+	lenlong := len([]byte(slice[0]))
 	for _, str := range slice {
-		if len(str) > len(longest) {
-			longest = str
+		strb := []byte(str)
+		if len(strb) > lenlong {
+			lenlong = len(strb)
 		}
 	}
-	return longest
+	return lenlong
 }
 
 func LoadFile(filepath, col_name string) []string {

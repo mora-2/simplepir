@@ -15,7 +15,7 @@ import (
 
 var program string = "client_offline.go"
 var ip_config_file_path string = "../config/ip_config.json"
-var offline_file_path string = "../data/offline_data"
+var offline_file_path string = "../../../../app/data/offline/offline_data"
 var log_file_path string = "log.txt"
 
 func main() {
